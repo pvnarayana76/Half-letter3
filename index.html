@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Samyukt Vyanjan Builder</title>
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --success: #2ECC71;
+            --warning: #F39C12;
+            --danger: #E74C3C;
+            --accent: #9B59B6;
+            --secondary: #95A5A6;
+            --background: #E8F0FE;
+            --card-bg: #FFFFFF;
+            --text: #333333;
+            --solved-bg: #E8F8F5;
+        }
+
+        /* --- THE "LOCKED APP" STRATEGY --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            height: 100vh;           /* Locks to exact screen height */
+            width: 100vw;
+            overflow: hidden;        /* Prevents whole-page scrolling */
+            display: flex;
+            justify-content: center;
+            touch-action: none;      /* Disables pull-to-refresh and native drag */
+        }
+
+        .app-container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 650px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;  /* Stacks inner elements vertically */
+            box-shadow: 0 0 20px rgba(0,0,0,0.15);
+        }
+
+        /* 1. Header Area (Fixed Top) */
+        .header-controls {
+            padding: 15px 20px 10px;
+            border-bottom: 2px solid #EEE;
+            flex-shrink: 0;          /* Prevents header from shrinking */
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        h1 { color: var(--primary); margin: 0; font-size: 1.4rem; }
+
+        .badge { font-size: 0.9rem; font-weight: bold; padding: 6px 12px; border-radius: 20px; }
+        .score-badge { background: var(--solved-bg); color: var(--success); }
+        .timer-badge { background: #FFF3E0; color: var(--warning); }
+
+        select {
+            padding: 8px; font-size: 1rem; border-radius: 8px;
+            border: 2px solid var(--primary); width: 100%; outline: none; background: white; cursor: pointer;
+        }
+
+        /* 2. Main Play Area (Flexes to fill middle space) */
+        .play-area {
+            flex-grow: 1;            /* Takes up all remaining vertical space */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            overflow: hidden;
+        }
+
+        .instructions { color: #7F8C8D; font-size: 0.95rem; text-align: center; margin-bottom: 10px; min-height: 20px;}
+
+        .word-display {
+            font-size: 3rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .workbench-display {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            min-height: 70px;
+        }
+
+        .drop-target {
+            width: 70px; height: 70px;
+            border: 3px dashed var(--primary); border-radius: 10px;
+            display: inline-flex; justify-content: center; align-items: center;
+            background-color: #F4F7F6; transition: all 0.2s ease;
+            font-size: 2rem;
+        }
+        
+        .solved-text { color: var(--success); font-weight: bold; }
+
+        #feedback {
+            margin-top: 10px; font-size: 1.2rem; font-weight: bold; min-height: 25px; text-align: center;
+        }
+        .success-text { color: var(--success); }
+        .error-text { color: var(--danger); }
+        .info-text { color: var(--primary); }
+
+        /* 3. Inventory Area (Fixed Bottom, internally scrollable if needed) */
+        .inventory-area {
+            background-color: #F8F9FA;
+            border-top: 2px solid #EEE;
+            padding: 15px;
+            min-height: 90px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            flex-shrink: 0;
+            overflow-y: auto;       /* Only this section scrolls if overcrowded */
+        }
+
+        /* 4. Control Panel (Fixed Bottom) */
+        .control-panel {
+            padding: 10px 15px 15px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-shrink: 0;
+            background-color: var(--card-bg);
+        }
+
+        button {
+            padding: 10px 20px; font-size: 1rem; border: none; border-radius: 8px;
+            cursor: pointer; font-weight: bold; color: white; transition: opacity 0.2s; flex: 1; max-width: 150px;
+        }
+        button:active { transform: scale(0.95); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-back { background-color: var(--secondary); }
+        .btn-skip { background-color: var(--warning); }
+        .btn-next { background-color: var(--success); }
+
+        /* Draggable Elements */
+        .draggable {
+            font-size: 1.8rem; padding: 10px 18px; background-color: var(--primary); color: white;
+            border-radius: 10px; cursor: grab; user-select: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            touch-action: none; z-index: 10; display: inline-flex; justify-content: center; align-items: center;
+        }
+        .draggable:active { cursor: grabbing; }
+        .is-dragging { transform: scale(1.15); opacity: 0.9; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+
+        .tool-halant { background-color: var(--accent); font-size: 1.4rem; }
+        .half-letter-state { background-color: #34495E; }
+        .combined-state { background-color: var(--success); }
+
+        /* --- LANDSCAPE & SMALL SCREEN FIXES --- */
+        @media (max-height: 550px) {
+            .header-controls { padding: 5px 15px; }
+            .stats-row { margin-bottom: 5px; }
+            h1 { font-size: 1.1rem; }
+            select { padding: 4px; font-size: 0.9rem; }
+            .word-display { font-size: 2.2rem; gap: 4px; }
+            .drop-target { width: 50px; height: 50px; font-size: 1.5rem; }
+            .draggable { font-size: 1.4rem; padding: 6px 12px; }
+            .workbench-display { margin-top: 10px; min-height: 55px; }
+            .inventory-area { padding: 8px; min-height: 60px; }
+            .control-panel { padding: 5px 10px 10px; }
+            button { padding: 8px 10px; font-size: 0.9rem; }
+            #feedback { font-size: 1rem; min-height: 20px; margin-top: 5px; }
+            .instructions { margin-bottom: 5px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="header-controls">
+            <div class="stats-row">
+                <h1>Samyukt Vyanjan</h1>
+                <div class="badge score-badge" id="score-display">Score: 0</div>
+                <div class="badge timer-badge" id="timer-display">00:00</div>
+            </div>
+            <select id="level-select" onchange="switchLevel()">
+                <option value="1">Level 1: Missing Link (6th Grade)</option>
+                <option value="2">Level 2: Halant Combiner (7th Grade)</option>
+            </select>
+        </div>
+
+        <div class="play-area">
+            <div class="instructions" id="instructions"></div>
+            <div id="game-word-area"></div>
+            <div id="game-workbench-area"></div>
+            <div id="feedback"></div>
+        </div>
+
+        <div class="inventory-area" id="inventory-area"></div>
+
+        <div class="control-panel">
+            <button class="btn-back" id="back-btn" onclick="goBack()">⬅ Back</button>
+            <button class="btn-skip" id="skip-btn" onclick="loadNextLevel()">Skip ➔</button>
+            <button class="btn-next" id="next-btn" onclick="loadNextLevel()">Next Word ➔</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CURATED PACING (Option B) ---
+        const level1Bank = [
+            { word: "पुस्तक", pre: "पु", post: "क", missing: "स्त", options: ["स्त", "श्त", "प्त"] }, 
+            { word: "बिल्ली", pre: "बि", post: "ी", missing: "ल्ल", options: ["ल्ब", "ल्ल", "ल्त"] }, 
+            { word: "कक्षा", pre: "क", post: "ा", missing: "क्ष", options: ["क्ष", "त्र", "श्र"] },     
+            { word: "पत्ता", pre: "प", post: "ा", missing: "त्त", options: ["त्त", "क्त", "प्त"] },   
+            { word: "आश्रम", pre: "आ", post: "म", missing: "श्र", options: ["श्र", "प्र", "त्र"] },     
+            { word: "डिब्बा", pre: "डि", post: "ा", missing: "ब्ब", options: ["ब्ब", "डब", "द्व"] },  
+            { word: "ज्ञान", pre: "", post: "ान", missing: "ज्ञ", options: ["ज्ञ", "श्र", "क्ष"] },      
+            { word: "मक्खी", pre: "म", post: "ी", missing: "क्ख", options: ["ख्क", "क्ख", "ल्क"] }  
+        ];
+
+        const level2Bank = [
+            { word: "पक्का", pre: "प", post: "ा", c1: "क", c2: "क", halfC1: "क्", combined: "क्क" }, 
+            { word: "सत्य", pre: "स", post: "", c1: "त", c2: "य", halfC1: "त्", combined: "त्य" },   
+            { word: "मित्र", pre: "मि", post: "", c1: "त", c2: "र", halfC1: "त्", combined: "त्र" },   
+            { word: "कष्ट", pre: "क", post: "", c1: "ष", c2: "ट", halfC1: "ष्", combined: "ष्ट" },   
+            { word: "विज्ञान", pre: "वि", post: "ान", c1: "ज", c2: "ञ", halfC1: "ज्", combined: "ज्ञ" }, 
+            { word: "शब्द", pre: "श", post: "", c1: "ब", c2: "द", halfC1: "ब्", combined: "ब्द" },   
+            { word: "श्रम", pre: "", post: "म", c1: "श", c2: "र", halfC1: "श्", combined: "श्र" },     
+            { word: "मुख्य", pre: "मु", post: "", c1: "ख", c2: "य", halfC1: "ख्", combined: "ख्य" }  
+        ];
+
+        // --- GLOBAL STATE & MEMORY ---
+        let currentLevel = 1;
+        let currentIndex = 0;
+        let score = 0;
+        let timeElapsed = 0;
+        let timerInterval;
+        let currentData = null;
+        
+        let solvedWords = { 1: new Set(), 2: new Set() };
+
+        // --- CUSTOM MOBILE DRAG ENGINE ---
+        let activeDrag = null;
+        let offsetX = 0, offsetY = 0;
+        let originalParent = null, originalNextSibling = null;
+
+        function initPointerDrag() {
+            document.addEventListener('pointerdown', e => {
+                if (!e.target.classList.contains('draggable')) return;
+                activeDrag = e.target;
+                const rect = activeDrag.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+
+                originalParent = activeDrag.parentNode;
+                originalNextSibling = activeDrag.nextSibling;
+
+                activeDrag.style.position = 'fixed';
+                activeDrag.style.left = `${e.clientX - offsetX}px`;
+                activeDrag.style.top = `${e.clientY - offsetY}px`;
+                activeDrag.classList.add('is-dragging');
+                activeDrag.setPointerCapture(e.pointerId);
+                e.preventDefault();
+            });
+
+            document.addEventListener('pointermove', e => {
+                if (!activeDrag) return;
+                activeDrag.style.left = `${e.clientX - offsetX}px`;
+                activeDrag.style.top = `${e.clientY - offsetY}px`;
+            });
+
+            document.addEventListener('pointerup', e => {
+                if (!activeDrag) return;
+                activeDrag.releasePointerCapture(e.pointerId);
+                activeDrag.classList.remove('is-dragging');
+                
+                activeDrag.style.pointerEvents = 'none';
+                const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                activeDrag.style.pointerEvents = 'auto';
+
+                const dropTarget = elemBelow ? elemBelow.closest('.drop-target') : null;
+                let success = false;
+
+                if (dropTarget) {
+                    success = processDrop(activeDrag, dropTarget);
+                }
+
+                if (!success && activeDrag) {
+                    activeDrag.style.position = '';
+                    activeDrag.style.left = '';
+                    activeDrag.style.top = '';
+                    if(originalNextSibling) originalParent.insertBefore(activeDrag, originalNextSibling);
+                    else originalParent.appendChild(activeDrag);
+                }
+
+                activeDrag = null;
+            });
+        }
+
+        // --- GAME LOGIC ---
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timeElapsed = 0;
+            document.getElementById('timer-display').textContent = formatTime(timeElapsed);
+            timerInterval = setInterval(() => {
+                timeElapsed++;
+                document.getElementById('timer-display').textContent = formatTime(timeElapsed);
+            }, 1000);
+        }
+
+        function switchLevel() {
+            currentLevel = parseInt(document.getElementById('level-select').value);
+            currentIndex = 0;
+            initLevel();
+        }
+
+        function goBack() {
+            if (currentIndex > 0) { currentIndex--; initLevel(); }
+        }
+
+        function loadNextLevel() {
+            const activeBank = currentLevel === 1 ? level1Bank : level2Bank;
+            currentIndex++;
+            if (currentIndex >= activeBank.length) currentIndex = 0;
+            initLevel();
+        }
+
+        function triggerWin(word) {
+            if (!solvedWords[currentLevel].has(currentIndex)) {
+                score += 10;
+                solvedWords[currentLevel].add(currentIndex);
+                document.getElementById('score-display').textContent = `Score: ${score}`;
+            }
+            const fb = document.getElementById('feedback');
+            fb.textContent = `Correct! ${word}`;
+            fb.className = 'success-text';
+            
+            document.getElementById('skip-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'inline-block';
+            document.getElementById('inventory-area').innerHTML = ''; 
+        }
+
+        function triggerError() {
+            const fb = document.getElementById('feedback');
+            fb.textContent = "Try Again!";
+            fb.className = 'error-text';
+            setTimeout(() => { if (fb.textContent === "Try Again!") fb.textContent = ''; }, 1200);
+        }
+
+        function initLevel() {
+            const activeBank = currentLevel === 1 ? level1Bank : level2Bank;
+            currentData = activeBank[currentIndex];
+
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('back-btn').disabled = (currentIndex === 0);
+            document.getElementById('game-word-area').innerHTML = '';
+            document.getElementById('game-workbench-area').innerHTML = '';
+            document.getElementById('inventory-area').innerHTML = '';
+
+            if (solvedWords[currentLevel].has(currentIndex)) {
+                renderSolvedState();
+            } else {
+                document.getElementById('next-btn').style.display = 'none';
+                document.getElementById('skip-btn').style.display = 'inline-block';
+                if (currentLevel === 1) renderLevel1();
+                else renderLevel2();
+            }
+        }
+
+        function renderSolvedState() {
+            document.getElementById('instructions').innerHTML = "You have already completed this word.";
+            
+            let displayLetter = currentLevel === 1 ? currentData.missing : currentData.combined;
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'word-display';
+            wordDiv.innerHTML = `<span>${currentData.pre}</span><span class="solved-text">${displayLetter}</span><span>${currentData.post}</span>`;
+            document.getElementById('game-word-area').appendChild(wordDiv);
+
+            document.getElementById('feedback').textContent = `Completed: ${currentData.word}`;
+            document.getElementById('feedback').className = 'info-text';
+            document.getElementById('skip-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'inline-block';
+        }
+
+        function renderLevel1() {
+            document.getElementById('instructions').innerHTML = "Drag the correct joint letter to complete the word.";
+            
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'word-display';
+            wordDiv.innerHTML = `<span>${currentData.pre}</span><div class="drop-target" id="main-drop"></div><span>${currentData.post}</span>`;
+            document.getElementById('game-word-area').appendChild(wordDiv);
+
+            const inventory = document.getElementById('inventory-area');
+            const shuffled = [...currentData.options].sort(() => Math.random() - 0.5);
+            shuffled.forEach(opt => {
+                const box = document.createElement('div');
+                box.className = 'draggable';
+                box.textContent = opt;
+                box.dataset.value = opt;
+                box.dataset.type = 'missing-link';
+                inventory.appendChild(box);
+            });
+        }
+
+        function renderLevel2() {
+            document.getElementById('instructions').innerHTML = "<strong>1:</strong> Drag Halant to first letter. <strong>2:</strong> Drag Half-letter to second. <strong>3:</strong> Drag final letter to box.";
+            
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'word-display';
+            wordDiv.innerHTML = `<span>${currentData.pre}</span><div class="drop-target" id="main-drop"></div><span>${currentData.post}</span>`;
+            document.getElementById('game-word-area').appendChild(wordDiv);
+
+            const workbenchDiv = document.createElement('div');
+            workbenchDiv.className = 'workbench-display';
+            workbenchDiv.innerHTML = `
+                <div class="drop-target" id="c1-box">${currentData.c1}</div>
+                <div class="drop-target" id="c2-box">${currentData.c2}</div>
+            `;
+            document.getElementById('game-workbench-area').appendChild(workbenchDiv);
+
+            const inventory = document.getElementById('inventory-area');
+            inventory.innerHTML = `<div class="draggable tool-halant" data-type="halant">् (Halant)</div>`;
+        }
+
+        function processDrop(draggedEl, targetEl) {
+            if (currentLevel === 1 && targetEl.id === 'main-drop') {
+                if (draggedEl.dataset.value === currentData.missing) {
+                    targetEl.textContent = currentData.missing;
+                    targetEl.style.border = 'none'; targetEl.style.background = 'transparent'; targetEl.style.color = 'var(--success)';
+                    triggerWin(currentData.word);
+                    return true;
+                }
+                triggerError(); return false;
+            }
+            
+            if (currentLevel === 2) {
+                if (draggedEl.dataset.type === 'halant' && targetEl.id === 'c1-box') {
+                    targetEl.textContent = currentData.halfC1;
+                    targetEl.classList.remove('drop-target');
+                    targetEl.classList.add('draggable', 'half-letter-state');
+                    targetEl.dataset.type = 'half-c1';
+                    draggedEl.remove(); return true;
+                }
+                if (draggedEl.dataset.type === 'half-c1' && targetEl.id === 'c2-box') {
+                    targetEl.textContent = currentData.combined;
+                    targetEl.classList.remove('drop-target');
+                    targetEl.classList.add('draggable', 'combined-state');
+                    targetEl.dataset.type = 'combined';
+                    draggedEl.remove(); return true;
+                }
+                if (draggedEl.dataset.type === 'combined' && targetEl.id === 'main-drop') {
+                    targetEl.textContent = currentData.combined;
+                    targetEl.style.border = 'none'; targetEl.style.background = 'transparent'; targetEl.style.color = 'var(--success)';
+                    draggedEl.remove(); triggerWin(currentData.word); return true;
+                }
+                triggerError(); return false;
+            }
+            return false;
+        }
+
+        initPointerDrag();
+        startTimer();
+        initLevel();
+    </script>
+</body>
+</html>
