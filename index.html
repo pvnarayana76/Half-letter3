@@ -18,14 +18,14 @@
             --solved-bg: #E8F8F5;
         }
 
-        /* --- THE "LOCKED APP" STRATEGY --- */
+        /* --- THE "LOCKED APP" STRATEGY (Fixed for Mobile URL Bars) --- */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--background);
             color: var(--text);
             margin: 0;
             padding: 0;
-            height: 100vh;           /* Locks to exact screen height */
+            height: 100dvh;          /* 100dvh fixes the mobile address bar hiding the bottom */
             width: 100vw;
             overflow: hidden;        /* Prevents whole-page scrolling */
             display: flex;
@@ -68,7 +68,7 @@
             border: 2px solid var(--primary); width: 100%; outline: none; background: white; cursor: pointer;
         }
 
-        /* 2. Main Play Area (Flexes to fill middle space) */
+        /* 2. Main Play Area (Flexes to fill middle space, scrolls if squished) */
         .play-area {
             flex-grow: 1;            /* Takes up all remaining vertical space */
             display: flex;
@@ -76,7 +76,7 @@
             align-items: center;
             justify-content: center;
             padding: 10px 20px;
-            overflow: hidden;
+            overflow-y: auto;        /* Allows middle to scroll if screen is too short in landscape */
         }
 
         .instructions { color: #7F8C8D; font-size: 0.95rem; text-align: center; margin-bottom: 10px; min-height: 20px;}
@@ -134,8 +134,9 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            flex-shrink: 0;
+            flex-shrink: 0;         /* Locks it to the bottom */
             background-color: var(--card-bg);
+            z-index: 100;
         }
 
         button {
@@ -152,7 +153,7 @@
         .draggable {
             font-size: 1.8rem; padding: 10px 18px; background-color: var(--primary); color: white;
             border-radius: 10px; cursor: grab; user-select: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            touch-action: none; z-index: 10; display: inline-flex; justify-content: center; align-items: center;
+            touch-action: none; z-index: 200; display: inline-flex; justify-content: center; align-items: center;
         }
         .draggable:active { cursor: grabbing; }
         .is-dragging { transform: scale(1.15); opacity: 0.9; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
